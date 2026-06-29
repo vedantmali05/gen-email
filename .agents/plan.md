@@ -1,49 +1,30 @@
 # Gen Email - Roadmap & Ideas
 
-## Goal
+**Problem**
+- Generated email has lines which were never given in the input.
 
-Learn GenAI by building an AI Email Assistant.
+**Solution**
+- Input basic details like rescipient name & email, and context
+- System shall reason the context and ask follow up questions (multiple choice, multiple select, extra general input, etc. - like Claude)
+- This will help AI to stay on the point, having proper information, and no extras.
 
-## Phase 1
+---
 
--   Generate email
--   Streamlit UI
--   Gemini + LangChain
+**Problem**
+- Every emails requires some user data. Example: User's full name, contact, email, etc.
 
-## Current Problems
+**Solution**
+- A key-value repository could be provided for data in email, or Global Data
+- Reference: Postman's Variables View
+- For Global Variables, a separate page can be provided, no need to type of every project. Custom selection can be provided to select only relevant global variables.
 
--   Too many hardcoded inputs.
--   LLM hallucinates missing details.
+---
+**Prompt Rules**
 
-## Better Flow
-
-User gives intent.
-
-Agent asks follow-up questions until enough information is collected.
-
-Then generates email.
-
-## Your Data
-
-Key-Value editor.
-
-Examples: - Full Name - Roll Number - Course - Company - Phone -
-LinkedIn
-
-User selects variables to inject into prompt.
-
-## Global Variables
-
-Separate page.
-
-Reusable profile information.
-
-No need to type every email.
-
-## Hallucination Control
-
-Prompt rules: - Never invent facts. - Never assume actions. - Ask for
-missing information. - Use only supplied data.
+- Never invent facts.
+- Never assume actions.
+- Ask for missing information.
+- Use only supplied data.
 
 ## Future Scope
 
