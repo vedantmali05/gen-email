@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from pydantic import BaseModel, Field
 
 # --- CONFIG & ENVIRONMENT ---
@@ -35,8 +36,8 @@ class Email(BaseModel):
     body: str
 
 # Mock generator for fast testing
-def get_mock_analysis() -> AnalysisResponse:
-    return AnalysisResponse(
+def get_mock_analysis():
+    analysis_res = AnalysisResponse(
         needs_more_info=True,
         questions=[
             AnalysisQuestion(type="date_range", question="Leave dates?"),
@@ -47,8 +48,14 @@ def get_mock_analysis() -> AnalysisResponse:
             AnalysisQuestion(type="multi_select", question="Mention achievements?", options=["Research Paper", "Patent", "Hackathon Win", "Internship"])
         ]
     )
+    return lambda x: {"status": "ask_questions", "data": analysis_res}
 
 # --- HELPER FUNCTIONS ---
+def add_metadata(inputs: dict):
+    """Feeds metadata to prompt automatically via a chain"""
+    inputs['today'] = date.today().isoformat()
+    return inputs
+
 def print_options(options: list[str]) -> None:
     """Print numbered list of options."""
     for i, opt in enumerate(options, 1):
@@ -60,24 +67,34 @@ def parse_choice(choice: str, options: list[str]) -> str:
     clean_text = re.sub(r'[\d,]', '', choice)
     clean_text = re.sub(r'\s+', ' ', clean_text).strip()
     
-    sel_options = ""
-    
+    sel_list = []
     for num in all_nums:
         idx = int(num) - 1
-        if 0 <= idx <= len(options):
-            sel_options += f" {options[idx]},"
+        if 0 <= idx < len(options):
+            sel_list.append(options[idx])
     
-    return f"{sel_options} and {clean_text}".strip()
+    # 🔥 Refactored tracking to use a list and join cleanly with no trailing commas
+    sel_options = ", ".join(sel_list)
+    if clean_text:
+        return f"{sel_options} and {clean_text}".strip() if sel_options else clean_text
+    return sel_options
+
+def route_by_status(inputs: dict):
+    """If info is required, take inputs, if not required, move to generator chain"""
+    analysis_response = inputs["analysis"]
+    
+    if analysis_response.needs_more_info:
+        return RunnableLambda(lambda x: {"status": "ask_questions", "data": analysis_response})
+    else:
+        return generator_chain
+    
 
 # --- CORE LLM INITIALIZATION ---
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 analysis_llm = model.with_structured_output(AnalysisResponse)
-email_llm = model.with_structured_output(Email)
+generator_llm = model.with_structured_output(Email)
 
 # --- PROMPT TEMPLATES ---
-# --- PROMPT TEMPLATES ---
-
-# Checks if info enough. Asks short follow-up questions.
 analysis_prompt = ChatPromptTemplate.from_messages([
     (
         "system", 
@@ -103,7 +120,6 @@ analysis_prompt = ChatPromptTemplate.from_messages([
     MessagesPlaceholder("messages")
 ])
 
-# Writes final email. Uses only verified facts.
 generator_prompt = ChatPromptTemplate.from_messages([
     (
         "system",
@@ -126,12 +142,19 @@ generator_prompt = ChatPromptTemplate.from_messages([
     MessagesPlaceholder("messages")
 ])
 
+# --- CHAINS ----
+analysis_chain = add_metadata | analysis_prompt | analysis_llm
+generator_chain = generator_prompt | generator_llm
+routing_chain = (
+    RunnablePassthrough.assign(analysis=analysis_chain)
+    | route_by_status
+)
+
 # --- MAIN EXECUTION ---
 def main():
     email_input = {}
     messages = []
 
-    # 1. Gather Inputs
     if DEV_MODE:
         email_input = MOCK_INPUT.copy()
     else: 
@@ -139,71 +162,58 @@ def main():
         email_input["email"] = input("Recipient Email: ")
         email_input["context"] = input("What would you like to type?\n")
 
-    # 2. Map input values to prompt vars
-    formatted_analysis_prompt = analysis_prompt.invoke({
-        "email_recipient_name": email_input["name"],
-        "email_recipient_email": email_input["email"],
-        "email_body_context": email_input["context"],
-        "today": date.today().isoformat(),
-        "messages": messages
-    })
+    while True:
+        if DEV_MODE:
+            routing_chain_output = get_mock_analysis()(None)
+        else:
+            routing_chain_output = routing_chain.invoke({
+                "email_recipient_name": email_input["name"],
+                "email_recipient_email": email_input["email"],
+                "email_body_context": email_input["context"],
+                "messages": messages
+            })
 
-    # 3. Call the AI
-    if DEV_MODE:
-        analysis_response = get_mock_analysis()
-    else:
-        analysis_response = analysis_llm.invoke(formatted_analysis_prompt)
+        if isinstance(routing_chain_output, dict) and routing_chain_output.get("status") == "ask_questions":
+            analysis_response = routing_chain_output["data"]
+            print("\nMore information required.")
+            print("Choose an option, enter custom answer, or press Enter to skip.")
 
-    # 2. Process Questions loop
-    if analysis_response.needs_more_info:
-        print("\nMore information required.")
-        print("Choose an option, enter custom answer, or press Enter to skip.")
+            if analysis_response.questions:
+                for q_num, q in enumerate(analysis_response.questions):
+                    print(f"\nQ{q_num + 1}) {q.question}")
+                    ans = ""
 
-    if analysis_response.questions:
-        for q_num, q in enumerate(analysis_response.questions):
-            print(f"\nQ{q_num + 1}) {q.question}")
-            ans = ""
+                    if q.type == "single_line":
+                        ans = input("Ans: ")
 
-            if q.type == "single_line":
-                ans = input("Ans: ")
+                    elif q.type == "date_range":
+                        start = input("Start Date: ")
+                        end = input("End Date: ")
+                        if not start and not end: ans = "Not specified"
+                        elif not start: ans = f"Ends on {end}"
+                        elif not end: ans = f"Starts on {start}"
+                        else: ans = f"from {start} to {end}"
 
-            elif q.type == "date_range":
-                start = input("Start Date: ")
-                end = input("End Date: ")
-                if not start and not end: ans = "Not specified"
-                elif not start: ans = f"Ends on {end}"
-                elif not end: ans = f"Starts on {start}"
-                else: ans = f"from {start} to {end}"
+                    elif q.type == "multi_choice":
+                        print_options(q.options or [])
+                        choice = input("Option No. (or custom): ")
+                        ans = parse_choice(choice, q.options or [])
 
-            elif q.type == "multi_choice":
-                print_options(q.options or [])
-                choice = input("Option No. (or custom): ")
-                ans = parse_choice(choice, q.options or [])
+                    elif q.type == "multi_select":
+                        print_options(q.options or [])
+                        choice = input("Option Nos. (e.g. 1,3) or custom: ")
+                        ans = parse_choice(choice, q.options or [])
 
-            elif q.type == "multi_select":
-                print_options(q.options or [])
-                choice = input("Option Nos. (e.g. 1,3) or custom: ")
-                ans = parse_choice(choice, q.options or [])
-
-            if ans:
-                messages.append(("human", f"{q.question}\nAnswer: {ans}"))
-
-    # 4. Generate Final Email
-    final_prompt = generator_prompt.invoke({
-        "email_recipient_name": email_input["name"],
-        "email_recipient_email": email_input["email"],
-        "email_body_context": email_input["context"],
-        "messages": messages,
-    })
-
-    if DEV_MODE:
-        final_results = Email(subject="Sample Subject", body="Sample Body")
-    else:
-        final_results = email_llm.invoke(final_prompt)
-
-    print("\n--- RESULTS ---")
-    print("Subject:", final_results.subject)
-    print("Body:\n", final_results.body)
+                    if ans:
+                        messages.append(("human", f"{q.question}\nAnswer: {ans}"))
+        else:
+            final_results = routing_chain_output
+                
+            print("\n--- RESULTS ---")
+            print("Subject:", final_results.subject)
+            print("Body:\n", final_results.body)
+            
+            break
 
 if __name__ == "__main__":
     main()
