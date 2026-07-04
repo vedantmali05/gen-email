@@ -4,6 +4,32 @@
 - Generated email is inaccurate:
     - Says: "Sincerely, Charles" in signature but, Charles is the recipient name
     - Very short body is being received.
+    - I have intentionally gave complex context to the model, having events, and queries in wrong logical order. The model shall suggest a right order before generating email, and wait for user to confirm it or suggest new order.
+    ```shell
+        (.venv) (base) ~/Projects/gen-email$ python main.py 
+            Recipient Name: Alice Boyd
+            Recipient Email: aliceboyd@summersea.com
+            What would you like to type?
+            I want to know the current prices of boats available at your store, along with their prices. I am Krissy Tideman, krissytideman@email.com, and I am loooking for renting the boats, not buying them. I will rent it for 7 days from 10th July. I am available to meet at 7 or 8th July. Please tell me the above things and also your availability.
+
+            --- RESULTS ---
+            Subject: Inquiry: Boat Rental Availability and Pricing - Krissy Tideman
+            Body:
+            Dear Alice Boyd,
+
+            I hope this email finds you well. I am writing to inquire about the current prices and availability of boats for rent at your store.
+
+            I am interested in renting a boat for 7 days, starting from July 10th. Could you please provide details on the types of boats available for rent during that period, along with their respective rental prices?
+
+            Additionally, I would like to arrange a meeting to discuss this further. I am available to meet on either July 7th or July 8th. Please let me know your availability on those dates.
+
+            Thank you for your time and assistance. I look forward to hearing from you soon.
+
+            Sincerely,
+            Krissy Tideman
+            krissytideman@email.com
+        (.venv) (base) ~/Projects/gen-email$
+    ```
     - Email treated as the recipient's POV, not users.
         ```shell
         (.venv) (base) ~/Projects/gen-email$ python3 main.py 
@@ -64,6 +90,8 @@
 ---
 ## Future Scope
 
+-   Few shot prompting
+-   Show a list of what new untold addition that has been added to email, to make the user beware of what changed. Example: Name changed from "J. Jonah Jameson" to "Mr. J. Jonah Jameson" so that user is aware of what the model assumes.
 -   Reply generation
 -   Follow-up generation
 -   Email history
@@ -76,3 +104,4 @@
 -   AI Agent
 -   Templates
 -   Multi-language
+-   Error handling and fallback mechanisms
