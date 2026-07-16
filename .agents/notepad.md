@@ -90,8 +90,7 @@
 ---
 ## Future Scope
 
--   Few shot prompting
--   Show a list of what new untold addition that has been added to email, to make the user beware of what changed. Example: Name changed from "J. Jonah Jameson" to "Mr. J. Jonah Jameson" so that user is aware of what the model assumes.
+-   Email correction: Iterative email improvement with new information
 -   Reply generation
 -   Follow-up generation
 -   Email history
@@ -105,3 +104,28 @@
 -   Templates
 -   Multi-language
 -   Error handling and fallback mechanisms
+
+# Sample Testing Inputs
+
+- Formal, sincere - To a senior person like Sushant Bansal, DRDO Secretary
+``` 
+Write a very formal email having a proper flow of information. I am pleased that Sushant Bansal, secretary of DRDO and a very important person contacted me recently. I want to reply. Thank you for their contact about the new Job opportunity. I accept it. Please suggest a time to meet in office. I am free 6th July onwards anytime. My details: Jaskirat Singh Rangi, jaskiratrangi@email.com, from Pathankot, Punjab. Make sure to add these details in email signature. Also add, please let me know if you need any of my details.
+```
+- Formal, casual - To request boat rental details
+```
+Please tell me the new boats available at your store. I am Krissy Tideman, krissytideman@email.com, I will rent it for 7 days from 10th July. I am available to meet at 7 or 8th July. Please tell me the above things and also your availability.
+```
+
+- Formal, casual, without enough information - Requesting details for new car model
+```
+Please send me new car details that released recently. Provide the specs and prices.
+```
+
+- Informal, sincere - To invite for a birthday party to Aunt May
+```
+We are hosting a birthday party of Harry Osborn. You're invited.
+```
+
+- Informal, casual - Invitation to a friend for a party
+```
+You're invited for my birthday on 10th July.
